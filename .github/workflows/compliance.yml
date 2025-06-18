@@ -1,0 +1,89 @@
+name: Compliance Check
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r crawler/requirements.txt
+          playwright install
+
+      - name: Run compliance scan
+        id: scan
+        run: |
+          # Run the scan and capture output
+          SCAN_OUTPUT=$(python crawler/scan.py ${{ github.event.repository.html_url }})
+          echo "scan_output<<EOF" >> $GITHUB_OUTPUT
+          echo "$SCAN_OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Parse scan time and check threshold
+          SCAN_TIME=$(echo "$SCAN_OUTPUT" | grep -o '"scan_time_ms": [0-9]*' | cut -d' ' -f2)
+          if [ "$SCAN_TIME" -gt 120000 ]; then
+            echo "Scan time ($SCAN_TIME ms) exceeds threshold (120000 ms)"
+            exit 1
+          fi
+          
+          # Check for high severity issues
+          if echo "$SCAN_OUTPUT" | grep -q '"severity": "high"'; then
+            echo "High severity issues found"
+            exit 1
+          fi
+
+      - name: Check for high severity violations
+        run: |
+          if jq '.violations[]? | select(.severity=="high")' scan_output.json; then
+            echo "High severity violation found!"
+            exit 1
+          else
+            echo "No high severity violations."
+          fi
+
+      - name: Update README badge
+        if: always()
+        run: |
+          # Determine badge status
+          if [ "${{ steps.scan.outcome }}" == "success" ]; then
+            BADGE="![Compliance](https://img.shields.io/badge/Compliance-✅%20Passing-brightgreen)"
+          else
+            BADGE="![Compliance](https://img.shields.io/badge/Compliance-❌%20Failed-red)"
+          fi
+          
+          # Update README.md
+          if grep -q "!\[Compliance\]" README.md; then
+            # Replace existing badge
+            sed -i "s/!\[Compliance\].*/$BADGE/" README.md
+          else
+            # Add badge after the title
+            sed -i "1s/^/# RegulaAI\n\n$BADGE\n\n/" README.md
+          fi
+          
+          # Commit and push changes
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git commit -m "Update compliance badge" || exit 0
+          git push
+
+      - name: Create GDPR badge
+        run: |
+          python scripts/create_badge.py <score>
+          git add gdpr_badge.svg
+          git commit -m "Update GDPR badge"
+          git push 

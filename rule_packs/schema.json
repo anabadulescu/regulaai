@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["name", "version", "rules"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the rule pack"
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of the rule pack"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the rule pack"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "severity", "condition"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the rule"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name of the rule"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what the rule checks"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Severity level of the rule violation"
+          },
+          "condition": {
+            "type": "object",
+            "required": ["type", "value"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["cookie_banner", "cookie_presence", "cookie_consent"],
+                "description": "Type of condition to check"
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Expected value for the condition"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} 

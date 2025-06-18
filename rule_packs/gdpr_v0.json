@@ -1,0 +1,27 @@
+{
+  "name": "GDPR Compliance v0",
+  "version": "0.1.0",
+  "description": "Basic GDPR compliance rules for cookie consent and privacy notices",
+  "rules": [
+    {
+      "id": "missing_cookie_consent_banner",
+      "name": "Missing Cookie Consent Banner",
+      "description": "Checks if a cookie consent banner is present on the page",
+      "severity": "high",
+      "condition": {
+        "type": "cookie_banner",
+        "value": true
+      }
+    },
+    {
+      "id": "cookies_before_consent",
+      "name": "Cookies Set Before Consent",
+      "description": "Checks if any cookies are set before user consent",
+      "severity": "high",
+      "condition": {
+        "type": "cookie_presence",
+        "value": false
+      }
+    }
+  ]
+} 

@@ -1,0 +1,26 @@
+name: Community Rule Validation
+
+on:
+  pull_request:
+    paths:
+      - 'community-rules/**.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pytest jsonschema
+      - name: Run rule validation tests
+        id: test
+        run: pytest rule_validation_tests.py
+      - name: Comment on PR
+        if: always()
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          message: ${{ steps.test.outcome == 'success' && '✅ passes schema' || '❌ fails' }} 

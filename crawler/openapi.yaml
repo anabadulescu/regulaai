@@ -1,0 +1,132 @@
+openapi: 3.1.0
+info:
+  title: RegulaAI Scanner API
+  description: API for scanning websites for GDPR compliance
+  version: 0.1.0
+  contact:
+    name: RegulaAI Support
+    email: support@regulaai.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.regulaai.com
+    description: Production server
+
+paths:
+  /scan:
+    post:
+      summary: Scan a website for GDPR compliance
+      description: Analyzes a website for cookie consent banners and pre-consent cookies
+      operationId: scanWebsite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '200':
+          description: Successful scan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+
+components:
+  schemas:
+    ScanRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL of the website to scan
+      example:
+        url: https://example.com
+
+    ScanResponse:
+      type: object
+      required:
+        - url
+        - cookies
+        - cookie_banner_detected
+        - cookie_banner_selectors
+        - scan_time_ms
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL that was scanned
+        cookies:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: string
+              domain:
+                type: string
+              path:
+                type: string
+          description: List of cookies found on the website
+        cookie_banner_detected:
+          type: boolean
+          description: Whether a cookie consent banner was detected
+        cookie_banner_selectors:
+          type: array
+          items:
+            type: string
+          description: CSS selectors that matched cookie banner elements
+        scan_time_ms:
+          type: integer
+          description: Time taken to perform the scan in milliseconds
+      example:
+        url: https://example.com
+        cookies:
+          - name: session
+            value: abc123
+            domain: example.com
+            path: /
+        cookie_banner_detected: false
+        cookie_banner_selectors: []
+        scan_time_ms: 1500
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
+
+    HTTPError:
+      type: object
+      properties:
+        detail:
+          type: string 

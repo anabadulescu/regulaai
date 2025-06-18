@@ -1,0 +1,33 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "RegulaAI Compliance Overview",
+    "panels": [
+      {
+        "type": "stat",
+        "title": "P95 Scan Duration (s)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(scan_duration_seconds_bucket[5m])) by (le))",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+      },
+      {
+        "type": "timeseries",
+        "title": "High-Severity Violations per Day",
+        "targets": [
+          {
+            "expr": "increase(violations_total{severity=\"high\"}[1d])",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+      }
+    ],
+    "schemaVersion": 37,
+    "version": 1,
+    "refresh": "5s"
+  }
+} 

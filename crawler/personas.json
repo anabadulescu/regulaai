@@ -1,0 +1,23 @@
+{
+  "EU_adult": {
+    "headers": {"Accept-Language": "en-GB"},
+    "viewport": {"width": 1280, "height": 800},
+    "proxy": {"server": "eu-proxy.example.com:3128"}
+  },
+  "US_adult": {
+    "headers": {"Accept-Language": "en-US"},
+    "viewport": {"width": 1280, "height": 800},
+    "proxy": {"server": "us-proxy.example.com:3128"}
+  },
+  "EU_child": {
+    "headers": {"Accept-Language": "en-GB"},
+    "viewport": {"width": 1024, "height": 600},
+    "proxy": {"server": "eu-proxy.example.com:3128"}
+  },
+  "WCAG_low_vision": {
+    "headers": {"Accept-Language": "en-GB"},
+    "viewport": {"width": 1280, "height": 800},
+    "proxy": {"server": "eu-proxy.example.com:3128"},
+    "accessibility": "low-vision"
+  }
+} 
