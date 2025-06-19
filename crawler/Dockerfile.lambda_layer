@@ -1,0 +1,17 @@
+FROM public.ecr.aws/lambda/python:3.10
+
+# Install system dependencies for Playwright
+RUN yum install -y atk cups-libs gtk3 libXcomposite libXcursor libXdamage libXext libXi libXrandr libXScrnSaver libXtst pango alsa-lib libXrandr libXss libasound2
+
+# Install Python dependencies
+RUN pip install --upgrade pip
+RUN pip install playwright playwright-aws-lambda
+
+# Install Playwright browsers
+RUN playwright install chromium
+
+# Set up Lambda layer structure
+RUN mkdir -p /opt/python
+RUN cp -r /var/lang/lib/python3.10/site-packages/* /opt/python/
+
+CMD ["/bin/bash"] 

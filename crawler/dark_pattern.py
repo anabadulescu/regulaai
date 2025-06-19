@@ -13,20 +13,25 @@ from PIL import Image
 import torch
 from transformers import ViTImageProcessor, ViTForImageClassification
 import numpy as np
+import os
 
 # Download model weights on first run
 MODEL_NAME = "nateraw/vit-base-patch16-224-in21k"
+
+PRO_PLAN_PRICE_ID = os.getenv("STRIPE_PRO_PLAN_PRICE_ID", "price_123")
+PRO_PLAN_SCANS_PER_MONTH = 10000
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_123")
 
 class DarkPatternClassifier:
     def __init__(self):
         self.processor = ViTImageProcessor.from_pretrained(MODEL_NAME)
         self.model = ViTForImageClassification.from_pretrained(MODEL_NAME)
-        self.model.eval()
+        self.model.eval()  # type: ignore
 
     def classify(self, img: Image.Image) -> Dict[str, float]:
-        inputs = self.processor(images=img, return_tensors="pt")
+        inputs = self.processor(images=img, return_tensors="pt")  # type: ignore
         with torch.no_grad():
-            outputs = self.model(**inputs)
+            outputs = self.model(**inputs)  # type: ignore
             logits = outputs.logits
             probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
         # For stub, map to our labels (simulate probabilities)

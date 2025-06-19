@@ -22,7 +22,34 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r crawler/requirements.txt
-          playwright install
+          npm ci
+          npx playwright install
+
+      # Start services with docker-compose
+      - name: Start services
+        run: |
+          docker-compose up -d
+          sleep 20  # Wait for services to be ready
+
+      # Run unit tests (if any)
+      - name: Run unit tests
+        run: |
+          pytest
+
+      # Run Playwright E2E tests
+      - name: Run Playwright tests
+        run: |
+          npx playwright test --trace on
+        env:
+          E2E_BASE_URL: http://localhost:3000
+
+      # Collect Playwright trace as artifact
+      - name: Upload Playwright traces
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-trace
+          path: playwright-report/
 
       - name: Run compliance scan
         id: scan

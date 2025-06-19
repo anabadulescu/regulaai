@@ -67,7 +67,7 @@ def load_persona(persona_id: str) -> dict:
         raise ValueError(f"Persona '{persona_id}' not found in personas.json")
     return personas[persona_id]
 
-async def run_scan(url: str, timeout: int = 120000, persona_id: Optional[str] = None, persona: Optional[dict] = None) -> dict:
+async def run_scan(url: str, timeout: int = 120000, persona_id: Optional[str] = None, persona: Optional[dict] = None, context=None) -> dict:
     start_time = time.time()
     log_event("scan_started", url=url, persona_id=persona_id)
     if persona_id:
@@ -84,128 +84,136 @@ async def run_scan(url: str, timeout: int = 120000, persona_id: Optional[str] = 
     if 'proxy' in persona:
         context_args['proxy'] = persona['proxy']
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(**context_args)
-        page = await context.new_page()
-
-        # Accessibility: low-vision (zoom)
-        if persona.get('accessibility') == 'low-vision':
-            await page.add_init_script("document.body.style.zoom='2'")
-
-        # Capture all network requests
-        network_requests = []
-        third_party_domains: Set[str] = set()
-        main_domain = urlparse(url).netloc
-
-        async def on_request(request):
-            req_url = request.url
-            network_requests.append(req_url)
-            req_domain = urlparse(req_url).netloc
-            if req_domain and req_domain != main_domain:
-                third_party_domains.add(req_domain)
-        page.on("request", on_request)
-
-        scan_id = hashlib.sha256(f"{url}-{time.time()}".encode()).hexdigest()
-
-        try:
-            await page.goto(url, wait_until='networkidle', timeout=timeout)
-        except Exception as e:
-            duration = int((time.time() - start_time) * 1000)
-            log_event("scan_failed", duration_ms=duration, url=url, error=str(e), persona_id=persona_id)
+    if context is None:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(**context_args)
+            result = await _run_scan_with_context(context, url, start_time, persona, context_args, timeout, persona_id)
             await context.close()
             await browser.close()
-            raise ValueError(f"Failed to load URL: {url}. Error: {e}")
+            return result
+    else:
+        # Reuse provided context
+        return await _run_scan_with_context(context, url, start_time, persona, context_args, timeout, persona_id)
 
-        # 1. Save full HTML
-        html_content = await page.content()
-        safe_domain = main_domain.replace(':', '_')
-        html_filename = f"scan_{safe_domain}.html"
-        with open(html_filename, "w", encoding="utf-8") as f:
-            f.write(html_content)
+async def _run_scan_with_context(context, url, start_time, persona, context_args, timeout, persona_id):
+    page = await context.new_page()
+    # Accessibility: low-vision (zoom)
+    if persona.get('accessibility') == 'low-vision':
+        await page.add_init_script("document.body.style.zoom='2'")
 
-        # 1b. Take screenshot and classify for dark patterns
-        screenshot_bytes = await page.screenshot(type="png")
-        img = Image.open(io.BytesIO(screenshot_bytes))
-        dark_probs = classify_dark_pattern(img)
-        violations = []
-        for label, prob in dark_probs.items():
-            if prob > 0.7:
-                violations.append({
-                    "id": f"dark_{label.lower()}",
-                    "description": f"Detected dark pattern: {label}",
-                    "severity": "high",
-                    "probability": prob
-                })
+    # Capture all network requests
+    network_requests = []
+    third_party_domains: Set[str] = set()
+    main_domain = urlparse(url).netloc
 
-        # 2. Detect <meta name="robots">
-        robots_meta = await page.query_selector('meta[name="robots"]')
-        robots_content = None
-        if robots_meta:
-            robots_content = await robots_meta.get_attribute('content')
+    async def on_request(request):
+        req_url = request.url
+        network_requests.append(req_url)
+        req_domain = urlparse(req_url).netloc
+        if req_domain and req_domain != main_domain:
+            third_party_domains.add(req_domain)
+    page.on("request", on_request)
 
-        # 3. Cookie banner detection (existing)
-        cookies = await context.cookies()
-        cookie_banner_detected = False
-        found_selectors = []
-        for selector in COOKIE_BANNER_SELECTORS:
-            try:
-                element = await page.query_selector(selector)
-                if element:
-                    cookie_banner_detected = True
-                    found_selectors.append(selector)
-            except Exception:
-                continue
+    scan_id = hashlib.sha256(f"{url}-{time.time()}".encode()).hexdigest()
 
-        # 1c. Capture <script src> hashes and response sizes
-        script_hashes = []
-        script_elements = await page.query_selector_all('script[src]')
-        for script in script_elements:
-            src = await script.get_attribute('src')
-            if not src:
-                continue
-            # Absolute URL
-            script_url = src if src.startswith('http') else urlparse(url)._replace(path=src).geturl()
-            sha256 = hashlib.sha256(script_url.encode()).hexdigest()
-            try:
-                resp = requests.get(script_url, timeout=5)
-                response_size = len(resp.content)
-            except Exception:
-                response_size = -1
-            script_hashes.append({
-                "script_url": script_url,
-                "sha256": sha256,
-                "response_size": response_size
-            })
-            # Save to DB
-            with engine.begin() as conn:
-                conn.execute(scan_scripts.insert().values(
-                    scan_id=scan_id,
-                    domain=main_domain,
-                    script_url=script_url,
-                    sha256=sha256,
-                    response_size=response_size
-                ))
-
+    try:
+        await page.goto(url, wait_until='networkidle', timeout=timeout)
+    except Exception as e:
+        duration = int((time.time() - start_time) * 1000)
+        log_event("scan_failed", duration_ms=duration, url=url, error=str(e), persona_id=persona_id)
         await context.close()
-        await browser.close()
-        scan_time_ms = int((time.time() - start_time) * 1000)
-        log_event("scan_completed", duration_ms=scan_time_ms, url=url, persona_id=persona_id)
-        return {
-            "url": url,
-            "cookies": cookies,
-            "cookie_banner_detected": cookie_banner_detected,
-            "cookie_banner_selectors": found_selectors,
-            "scan_time_ms": scan_time_ms,
-            "html_file": html_filename,
-            "robots_meta": robots_content,
-            "network_requests": network_requests,
-            "third_party_domains": sorted(list(third_party_domains)),
-            "persona_id": persona_id,
-            "violations": violations,
-            "script_hashes": script_hashes,
-            "scan_id": scan_id
-        }
+        await page.close()
+        raise ValueError(f"Failed to load URL: {url}. Error: {e}")
+
+    # 1. Save full HTML
+    html_content = await page.content()
+    safe_domain = main_domain.replace(':', '_')
+    html_filename = f"scan_{safe_domain}.html"
+    with open(html_filename, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+    # 1b. Take screenshot and classify for dark patterns
+    screenshot_bytes = await page.screenshot(type="png")
+    img = Image.open(io.BytesIO(screenshot_bytes))
+    dark_probs = classify_dark_pattern(img)
+    violations = []
+    for label, prob in dark_probs.items():
+        if prob > 0.7:
+            violations.append({
+                "id": f"dark_{label.lower()}",
+                "description": f"Detected dark pattern: {label}",
+                "severity": "high",
+                "probability": prob
+            })
+
+    # 2. Detect <meta name="robots">
+    robots_meta = await page.query_selector('meta[name="robots"]')
+    robots_content = None
+    if robots_meta:
+        robots_content = await robots_meta.get_attribute('content')
+
+    # 3. Cookie banner detection (existing)
+    cookies = await context.cookies()
+    cookie_banner_detected = False
+    found_selectors = []
+    for selector in COOKIE_BANNER_SELECTORS:
+        try:
+            element = await page.query_selector(selector)
+            if element:
+                cookie_banner_detected = True
+                found_selectors.append(selector)
+        except Exception:
+            continue
+
+    # 1c. Capture <script src> hashes and response sizes
+    script_hashes = []
+    script_elements = await page.query_selector_all('script[src]')
+    for script in script_elements:
+        src = await script.get_attribute('src')
+        if not src:
+            continue
+        # Absolute URL
+        script_url = src if src.startswith('http') else urlparse(url)._replace(path=src).geturl()
+        sha256 = hashlib.sha256(script_url.encode()).hexdigest()
+        try:
+            resp = requests.get(script_url, timeout=5)
+            response_size = len(resp.content)
+        except Exception:
+            response_size = -1
+        script_hashes.append({
+            "script_url": script_url,
+            "sha256": sha256,
+            "response_size": response_size
+        })
+        # Save to DB
+        with engine.begin() as conn:
+            conn.execute(scan_scripts.insert().values(
+                scan_id=scan_id,
+                domain=main_domain,
+                script_url=script_url,
+                sha256=sha256,
+                response_size=response_size
+            ))
+
+    await page.close()
+    scan_time_ms = int((time.time() - start_time) * 1000)
+    log_event("scan_completed", duration_ms=scan_time_ms, url=url, persona_id=persona_id)
+    return {
+        "url": url,
+        "cookies": cookies,
+        "cookie_banner_detected": cookie_banner_detected,
+        "cookie_banner_selectors": found_selectors,
+        "scan_time_ms": scan_time_ms,
+        "html_file": html_filename,
+        "robots_meta": robots_content,
+        "network_requests": network_requests,
+        "third_party_domains": sorted(list(third_party_domains)),
+        "persona_id": persona_id,
+        "violations": violations,
+        "script_hashes": script_hashes,
+        "scan_id": scan_id
+    }
 
 def maybe_autofix_privacy_policy(violations, repo_url, company_name, contact_email):
     for v in violations:

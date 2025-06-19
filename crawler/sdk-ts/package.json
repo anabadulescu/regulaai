@@ -1,0 +1,57 @@
+{
+  "name": "@regulaai/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for RegulaAI - GDPR compliance scanning API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "gdpr",
+    "compliance",
+    "scanning",
+    "api",
+    "typescript",
+    "sdk",
+    "regulaai"
+  ],
+  "author": "RegulaAI <support@regulaai.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/regulaai/regulaai-sdk-typescript.git"
+  },
+  "bugs": {
+    "url": "https://github.com/regulaai/regulaai-sdk-typescript/issues"
+  },
+  "homepage": "https://github.com/regulaai/regulaai-sdk-typescript#readme",
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+} 
