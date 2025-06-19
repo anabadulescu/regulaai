@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # RegulaAI
 
 ![Compliance](https://img.shields.io/badge/Compliance-⏳%20Pending-lightgrey)
@@ -39,3 +40,6 @@ GitHub Actions workflows for automated testing, building, and deployment of all 
 ## Development
 
 Each component has its own development environment and dependencies. Please refer to the individual README files in each directory for specific setup instructions. 
+=======
+# regulaai
+>>>>>>> 43d5dac87d83e7d6e81c142bfb58207243cf89a8
